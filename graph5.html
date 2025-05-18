@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Graph 5</title>
+    <style>
+      .chart-container {
+        flex-wrap: wrap;
+        justify-content: space-around;
+      }
+      .chart {
+        width: 100%;
+        margin-bottom: 20px;
+        border: 1px solid #ccc;
+        padding: 10px;
+      }
+      .chart h2 {
+        text-align: center;
+      }
+      .bar {
+        fill: steelblue;
+      }
+      .axis text {
+        font-size: 10px;
+      }
+      .tooltip {
+        position: absolute;
+        text-align: center;
+        padding: 6px 10px;
+        font: 12px sans-serif;
+        background: lightyellow;
+        border: 1px solid black;
+        border-radius: 8px;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+    </style>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+  </head>
+  <body>
+    <div class="chart-container">
+      <div class="chart" id="chart5">
+        <h2>Graph 5: Livraison Retardée par Zone + Cause</h2>
+      </div>
+      <div
+        id="legend5"
+        style="position: absolute; right: 40px; top: 120px"
+      ></div>
+    </div>
+
+    <script>
+      d3.csv("data/data.csv").then(function (data) {
+        const grouped = d3.rollups(
+          data.filter((d) => d.Cause && d.Statut === "Retard"),
+          (v) => v.length,
+          (d) => d.Zone,
+          (d) => d.Cause
+        );
+        const dataGraph5 = [];
+        grouped.forEach(([zone, causes]) => {
+          causes.forEach(([cause, count]) => {
+            dataGraph5.push({
+              Zone: zone,
+              Cause: cause,
+              Retards: count,
+            });
+          });
+        });
+
+        const dataGraph4 = data
+          .filter((d) => d.PointDeVente && d.TempsLivraisonMoyen)
+          .map((d) => ({
+            Zone: d.Zone,
+            PointDeVente: d.PointDeVente,
+            TempsLivraisonMoyen: +d.TempsLivraisonMoyen,
+          }));
+
+        createGraph5(dataGraph5);
+        createGraph4(dataGraph4);
+      });
+
+      function createGraph5(dataGraph5) {
+        const margin = { top: 20, right: 30, bottom: 60, left: 60 };
+        const width = 1200 - margin.left - margin.right;
+        const height = 700 - margin.top - margin.bottom;
+
+        const svg = d3
+          .select("#chart5")
+          .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+          .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3
+          .scaleBand()
+          .domain(dataGraph5.map((d) => d.Zone))
+          .range([0, width])
+          .padding(0.2);
+
+        svg
+          .append("g")
+          .attr("transform", `translate(0,${height})`)
+          .call(d3.axisBottom(x))
+          .selectAll("text")
+          .style("text-anchor", "middle");
+
+        const y = d3
+          .scaleLinear()
+          .domain([0, d3.max(dataGraph5, (d) => d.Retards)])
+          .nice()
+          .range([height, 0]);
+
+        svg.append("g").call(d3.axisLeft(y));
+
+        const xSubgroup = d3
+          .scaleBand()
+          .domain(dataGraph5.map((d) => d.Cause))
+          .range([0, x.bandwidth()])
+          .padding([0.05]);
+
+        const uniqueCauses = Array.from(
+          new Set(dataGraph5.map((d) => d.Cause))
+        );
+        const color = d3
+          .scaleSequential()
+          .domain([0, uniqueCauses.length - 1])
+          .interpolator(d3.interpolateBlues);
+
+        const causeColorMap = {};
+        uniqueCauses.forEach((cause, i) => {
+          causeColorMap[cause] = color(i);
+        });
+
+        const legendDiv = d3.select("#legend5");
+        legendDiv.html("");
+
+        uniqueCauses.forEach((cause) => {
+          const item = legendDiv
+            .append("div")
+            .style("display", "flex")
+            .style("align-items", "center")
+            .style("margin-bottom", "6px");
+          item
+            .append("div")
+            .style("width", "18px")
+            .style("height", "18px")
+            .style("background", causeColorMap[cause])
+            .style("margin-right", "8px")
+            .style("border", "1px solid #222");
+          item.append("span").text(cause).style("font-size", "13px");
+        });
+
+        svg
+          .selectAll(".barGroup")
+          .data(dataGraph5)
+          .enter()
+          .append("g")
+          .attr("class", "barGroup")
+          .attr("transform", (d) => `translate(${x(d.Zone)},0)`)
+          .append("rect")
+          .attr("class", "bar5")
+          .attr("x", (d) => xSubgroup(d.Cause))
+          .attr("y", (d) => y(d.Retards))
+          .attr("width", xSubgroup.bandwidth())
+          .attr("height", (d) => height - y(d.Retards))
+          .attr("fill", (d) => causeColorMap[d.Cause])
+          .attr("stroke", "#222")
+          .attr("stroke-width", 1);
+
+        const tooltip = d3
+          .select("body")
+          .append("div")
+          .attr("class", "tooltip")
+          .style("opacity", 0);
+
+        svg
+          .selectAll(".bar5")
+          .on("mouseover", (event, d) => {
+            tooltip.transition().duration(200).style("opacity", 0.9);
+            tooltip
+              .html(`${d.Cause}: ${d.Retards}`)
+              .style("left", event.pageX + "px")
+              .style("top", event.pageY - 28 + "px");
+          })
+          .on("mouseout", (event, d) => {
+            tooltip.transition().duration(500).style("opacity", 0);
+          });
+
+        svg
+          .append("text")
+          .attr("x", width / 2)
+          .attr("y", height + margin.top + 40)
+          .style("text-anchor", "middle")
+          .text("Zone");
+
+        svg
+          .append("text")
+          .attr("transform", "rotate(-90)")
+          .attr("y", 0 - margin.left)
+          .attr("x", 0 - height / 2)
+          .attr("dy", "1em")
+          .style("text-anchor", "middle")
+          .text("Nombre de Retards");
+      }
+    </script>
+  </body>
+</html>

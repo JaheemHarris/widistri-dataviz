@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Graph 4: Temps Moyen de Livraison par Zone x Point de Vente</title>
+    <style>
+      .chart-container {
+        display: flex;
+        justify-content: center;
+      }
+
+      .chart {
+        width: 80%;
+        margin-bottom: 20px;
+        border: 1px solid #ccc;
+        padding: 20px;
+      }
+
+      .chart h2 {
+        text-align: center;
+      }
+
+      .axis text {
+        font-size: 10px;
+      }
+
+      .tooltip {
+        position: absolute;
+        text-align: center;
+        padding: 6px 10px;
+        font: 12px sans-serif;
+        background: lightyellow;
+        border: 1px solid black;
+        border-radius: 8px;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+    </style>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+  </head>
+
+  <body>
+    <div class="chart-container">
+      <div class="chart" id="chart4-grouped-bar">
+        <h2>Graph 4: Temps Moyen de Livraison par Zone x Point de Vente</h2>
+      </div>
+    </div>
+
+    <script>
+      d3.csv("./data/data.csv").then(function (data) {
+        data.forEach((d) => {
+          d.TempsLivraisonMoyen = +d.TempsLivraisonMoyen;
+        });
+
+        createGroupedBarChart(data);
+      });
+
+      function createGroupedBarChart(dataGraph4) {
+        const margin = { top: 20, right: 120, bottom: 60, left: 60 };
+        const width = 800 - margin.left - margin.right;
+        const height = 400 - margin.top - margin.bottom;
+
+        const svg = d3
+          .select("#chart4-grouped-bar")
+          .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+          .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const zones = Array.from(new Set(dataGraph4.map((d) => d.Zone)));
+        const pointDeVentes = Array.from(
+          new Set(dataGraph4.map((d) => d.PointDeVente))
+        );
+
+        const x = d3.scaleBand().domain(zones).range([0, width]).padding(0.2);
+
+        svg
+          .append("g")
+          .attr("transform", `translate(0,${height})`)
+          .call(d3.axisBottom(x))
+          .selectAll("text")
+          .style("text-anchor", "middle");
+
+        const y = d3
+          .scaleLinear()
+          .domain([0, d3.max(dataGraph4, (d) => d.TempsLivraisonMoyen)])
+          .nice()
+          .range([height, 0]);
+
+        svg.append("g").call(d3.axisLeft(y));
+
+        const xSubgroup = d3
+          .scaleBand()
+          .domain(pointDeVentes)
+          .range([0, x.bandwidth()])
+          .padding([0.05]);
+
+        const color = d3
+          .scaleOrdinal()
+          .domain(pointDeVentes)
+          .range(
+            pointDeVentes.map((d, i) =>
+              d3.interpolateRainbow((i / pointDeVentes.length) * 0.9999)
+            )
+          );
+
+        const dataByZone = d3.group(dataGraph4, (d) => d.Zone);
+
+        svg
+          .selectAll(".barGroup")
+          .data(zones)
+          .enter()
+          .append("g")
+          .attr("class", "barGroup")
+          .attr("transform", (d) => `translate(${x(d)},0)`)
+          .selectAll("rect")
+          .data((zone) => dataByZone.get(zone) || [])
+          .enter()
+          .append("rect")
+          .attr("class", "bar")
+          .attr("x", (d) => xSubgroup(d.PointDeVente))
+          .attr("y", (d) => y(d.TempsLivraisonMoyen))
+          .attr("width", xSubgroup.bandwidth())
+          .attr("height", (d) => height - y(d.TempsLivraisonMoyen))
+          .attr("fill", (d) => color(d.PointDeVente));
+
+        svg
+          .append("text")
+          .attr("x", width / 2)
+          .attr("y", height + margin.top + 40)
+          .style("text-anchor", "middle")
+          .text("Zone");
+
+        svg
+          .append("text")
+          .attr("transform", "rotate(-90)")
+          .attr("y", 0 - margin.left)
+          .attr("x", 0 - height / 2)
+          .attr("dy", "1em")
+          .style("text-anchor", "middle")
+          .text("Temps Moyen de Livraison (jours)");
+
+        svg
+          .append("text")
+          .attr("x", width + 5)
+          .attr("y", -10)
+          .attr("class", "legend-title")
+          .style("font-size", "12px")
+          .style("font-weight", "bold")
+          .text("Point de vente");
+
+        const legend = svg
+          .selectAll(".legend")
+          .data(pointDeVentes)
+          .enter()
+          .append("g")
+          .attr("class", "legend")
+          .attr("transform", function (d, i) {
+            return "translate(" + (width + 5) + "," + i * 20 + ")";
+          });
+
+        legend
+          .append("rect")
+          .attr("x", 0)
+          .attr("width", 18)
+          .attr("height", 18)
+          .style("fill", color);
+
+        legend
+          .append("text")
+          .attr("x", 24)
+          .attr("y", 9)
+          .attr("dy", ".35em")
+          .style("text-anchor", "start")
+          .style("font-size", "10px")
+          .text(function (d) {
+            return d;
+          });
+
+        const tooltip = d3
+          .select("body")
+          .append("div")
+          .attr("class", "tooltip")
+          .style("opacity", 0);
+
+        svg
+          .selectAll(".bar")
+          .on("mouseover", (event, d) => {
+            tooltip.transition().duration(200).style("opacity", 0.9);
+            tooltip
+              .html(
+                `
+                        Zone: ${d.Zone}<br>
+                        Point: ${d.PointDeVente}<br>
+                        Temps Moyen: ${d.TempsLivraisonMoyen.toFixed(2)} jours
+                    `
+              )
+              .style("left", event.pageX + "px")
+              .style("top", event.pageY - 28 + "px");
+          })
+          .on("mouseout", (event, d) => {
+            tooltip.transition().duration(500).style("opacity", 0);
+          });
+      }
+    </script>
+  </body>
+</html>
