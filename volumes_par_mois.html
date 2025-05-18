@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Volume livré par mois (Bar Chart)</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 30px;
+        }
+
+        svg {
+            background: #f9f9f9;
+        }
+
+        .bar {
+            fill: steelblue;
+        }
+
+        .bar:hover {
+            fill: darkorange;
+        }
+
+        .tooltip {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>📊 Volume livré par mois (Bar Chart)</h2>
+    <div id="chart"></div>
+    <div class="tooltip"></div>
+
+    <script>
+        const margin = { top: 70, right: 30, bottom: 80, left: 80 },
+            width = 1000 - margin.left - margin.right,
+            height = 800 - margin.top - margin.bottom;
+
+        const svg = d3.select("#chart")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const tooltip = d3.select(".tooltip");
+
+        d3.csv("./data/data.csv").then(data => {
+            const parseDate = d3.timeParse("%Y-%m");
+            const formatDate = d3.timeFormat("%b %Y");
+
+            data.forEach(d => {
+                d.Mois = parseDate(d.Mois);
+                d.VolumeLitres = +d.VolumeLitres;
+            });
+
+            const x = d3.scaleBand()
+                .domain(data.map(d => d.Mois))
+                .range([0, width])
+                .padding(0.1);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.VolumeLitres)]).nice()
+                .range([height, 0]);
+
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x).tickFormat(formatDate))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            svg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height + 60)
+                .attr("text-anchor", "middle")
+                .style("font-size", "14px")
+                .text("Mois");
+
+            svg.append("g")
+                .call(d3.axisLeft(y)
+                    .ticks(Math.ceil(d3.max(data, d => d.VolumeLitres) / 25))
+                    .tickFormat(d => d + " L"));
+
+            svg.append("text")
+                .attr("x", 0)
+                .attr("y", -30)
+                .attr("text-anchor", "start")
+                .style("font-size", "14px")
+                .text("Volumes (Litres)");
+
+            svg.selectAll(".bar")
+                .data(data)
+                .enter().append("rect")
+                .attr("class", "bar")
+                .attr("x", d => x(d.Mois))
+                .attr("y", d => y(d.VolumeLitres))
+                .attr("width", x.bandwidth())
+                .attr("height", d => height - y(d.VolumeLitres))
+                .on("mouseover", (event, d) => {
+                    tooltip.style("opacity", 1)
+                        .html(`<strong>${formatDate(d.Mois)}</strong><br>${d.VolumeLitres} L`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", () => tooltip.style("opacity", 0));
+        });
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Commandes par Type de Client et Zone</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 30px;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>📊 Commandes par Type de Client et Zone</h2>
+    <div id="chart"></div>
+    <div class="tooltip"></div>
+
+    <script>
+        const margin = { top: 60, right: 30, bottom: 70, left: 80 },
+            width = 900 - margin.left - margin.right,
+            height = 500 - margin.top - margin.bottom;
+
+        const svg = d3.select("#chart")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const tooltip = d3.select(".tooltip");
+
+        d3.csv("./data/data.csv").then(data => {
+            data.forEach(d => {
+                d.NbCommandes = +d.NbCommandes;
+            });
+
+            const subgroups = ["Particulier", "Entreprise"];
+            const groups = [...new Set(data.map(d => d.Zone))];
+
+            const x0 = d3.scaleBand()
+                .domain(groups)
+                .range([0, width])
+                .padding(0.2);
+
+            const x1 = d3.scaleBand()
+                .domain(subgroups)
+                .range([0, x0.bandwidth()])
+                .padding(0.05);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.NbCommandes)]).nice()
+                .range([height, 0]);
+
+            const color = d3.scaleOrdinal()
+                .domain(subgroups)
+                .range(["#4e79a7", "#f28e2b"]);
+
+            // Axe X
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x0))
+                .selectAll("text")
+                .attr("transform", "rotate(-30)")
+                .style("text-anchor", "end");
+
+            // Axe Y
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            // 🔹 Label Y en haut, horizontal
+            svg.append("text")
+                .attr("x", 0)
+                .attr("y", -20)
+                .attr("text-anchor", "start")
+                .style("font-size", "14px")
+                .style("font-weight", "bold")
+                .text("Nombre de commandes");
+
+            // Dessin des barres
+            const grouped = d3.group(data, d => d.Zone);
+            svg.selectAll("g.zone")
+                .data(grouped)
+                .join("g")
+                .attr("transform", d => `translate(${x0(d[0])},0)`)
+                .selectAll("rect")
+                .data(d => d[1])
+                .join("rect")
+                .attr("x", d => x1(d.TypeClient))
+                .attr("y", d => y(d.NbCommandes))
+                .attr("width", x1.bandwidth())
+                .attr("height", d => height - y(d.NbCommandes))
+                .attr("fill", d => color(d.TypeClient))
+                .on("mouseover", (event, d) => {
+                    tooltip.style("opacity", 1)
+                        .html(`<strong>${d.Zone}</strong><br>${d.TypeClient} : ${d.NbCommandes} commandes`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", () => tooltip.style("opacity", 0));
+
+            // Légende
+            const legend = svg.append("g")
+                .attr("transform", `translate(${width - 150}, 0)`);
+
+            subgroups.forEach((type, i) => {
+                const g = legend.append("g").attr("transform", `translate(0, ${i * 20})`);
+                g.append("rect")
+                    .attr("width", 15).attr("height", 15)
+                    .attr("fill", color(type));
+                g.append("text")
+                    .attr("x", 20).attr("y", 12)
+                    .text(type)
+                    .style("font-size", "12px");
+            });
+        });
+    </script>
+
+</body>
+
+</html>
