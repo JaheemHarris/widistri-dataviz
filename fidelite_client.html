@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="utf-8">
+  <title>Carte Clients & Dépôts Widistri</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      padding: 20px;
+      gap: 20px;
+    }
+
+    #map {
+      width: 800px;
+      height: 400px;
+      border: 1px solid #ccc;
+    }
+
+    .legend {
+      font-size: 14px;
+      line-height: 1.8;
+      padding: 10px;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      max-width: 250px;
+      height: fit-content;
+    }
+
+    .legend div {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .circle {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .particulier {
+      background-color: #4e79a7;
+    }
+
+    .entreprise {
+      background-color: #f28e2b;
+    }
+
+    .depot {
+      background-color: #2ca02c;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="map"></div>
+
+  <div class="legend">
+    <strong>Légende</strong>
+    <div><span class="circle particulier"></span> Client Particulier</div>
+    <div><span class="circle entreprise"></span> Client Entreprise</div>
+    <div><span class="circle depot"></span> Dépôt Widistri</div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <script>
+    const map = L.map('map').setView([-18.8792, 47.5079], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    const markerClusterGroup = L.markerClusterGroup();
+    const heatPoints = [];
+
+    // Charger les clients
+    d3.csv("./data/data.csv").then(data => {
+      data.forEach(d => {
+        const lat = +d.Latitude;
+        const lon = +d.Longitude;
+        const type = d.TypeClient;
+        const zone = d.Zone;
+
+        const color = type === "Entreprise" ? "#f28e2b" : "#4e79a7";
+
+        const marker = L.circleMarker([lat, lon], {
+          radius: 6,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.8
+        }).bindPopup(`<strong>${type}</strong><br>${zone}`);
+
+        markerClusterGroup.addLayer(marker);
+        heatPoints.push([lat, lon, 0.6]);
+      });
+
+      map.addLayer(markerClusterGroup);
+
+      // Heatmap
+      const heat = L.heatLayer(heatPoints, {
+        radius: 25,
+        blur: 15,
+        maxZoom: 17
+      }).addTo(map);
+    });
+
+    // Dépôts (icône verte 🟢)
+    const depots = [
+      { name: "By Pass", lat: -18.905, lon: 47.570 },
+      { name: "Analakely", lat: -18.913, lon: 47.529 },
+      { name: "Andraharo", lat: -18.895, lon: 47.531 },
+      { name: "Itaosy", lat: -18.925, lon: 47.486 }
+    ];
+
+    depots.forEach(d => {
+      L.circleMarker([d.lat, d.lon], {
+        radius: 7,
+        color: "#2ca02c",
+        fillColor: "#2ca02c",
+        fillOpacity: 1
+      })
+        .bindPopup(`<strong>Dépôt :</strong> ${d.name}`)
+        .addTo(map);
+    });
+  </script>
+
+</body>
+
+</html>
